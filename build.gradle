@@ -1,0 +1,30 @@
+group 'com.github.bpazy'
+version '1.0'
+
+apply plugin: 'java'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile 'com.github.kevinsawicki:http-request:6.0'
+    compile 'org.hibernate:hibernate-core:5.2.5.Final'
+    compile group: 'org.jsoup', name: 'jsoup', version: '1.10.1'
+    compile group: 'mysql', name: 'mysql-connector-java', version: '6.0.5'
+    compile group: 'redis.clients', name: 'jedis', version: '2.9.0'
+
+}
+
+task fatJar(type: Jar) {
+    manifest {
+        attributes 'Implementation-Version': version,
+                'Main-Class': 'com.github.bpazy.Main'
+    }
+    baseName = project.name
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
