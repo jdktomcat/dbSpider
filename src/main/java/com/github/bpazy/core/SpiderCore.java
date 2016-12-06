@@ -25,13 +25,6 @@ public abstract class SpiderCore<T> {
         this.queueAndRedis = queueAndRedis;
     }
 
-    /**
-     * 相关的URL
-     *
-     * @return 选择器，例如: "div#recommendations div dl dt a" 电影页面的相关电影
-     */
-    protected abstract String relatedUrlSelect();
-
     void run() {
         String body = HttpRequest
                 .get(target)
@@ -65,6 +58,13 @@ public abstract class SpiderCore<T> {
     }
 
     /**
+     * 相关的URL
+     *
+     * @return 选择器，例如: "div#recommendations div dl dt a" 电影页面的相关电影
+     */
+    protected abstract String relatedUrlSelect();
+
+    /**
      * 用于判断model是否合法
      *
      * @param model model
@@ -80,6 +80,11 @@ public abstract class SpiderCore<T> {
      */
     protected abstract T getModel(Document doc);
 
+    /**
+     * @param doc    Document对象
+     * @param select 选择器
+     * @return 选择器对应的标签的值
+     */
     protected String infoSelect(Document doc, String select) {
         return doc.select(select).text();
     }
