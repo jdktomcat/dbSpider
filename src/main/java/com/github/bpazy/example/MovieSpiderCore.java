@@ -21,7 +21,7 @@ public class MovieSpiderCore extends SpiderCore<Movie> {
 
     @Override
     protected boolean isValid(Movie model) {
-        return "".equals(model.getTitle());
+        return !"".equals(model.getTitle());
     }
 
     @Override

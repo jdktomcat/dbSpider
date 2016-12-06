@@ -15,7 +15,7 @@ import org.jsoup.select.Elements;
  * 2016/12/6 15:10
  */
 public abstract class SpiderCore<T> {
-    private static final int TIMEOUT = 1000 * 10;
+    private static final int TIMEOUT = 1000 * 30;
     private String target;
     private QueueAndRedis queueAndRedis;
     private SessionFactory factory = SqlFactory.getSessionFactory();

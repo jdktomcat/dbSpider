@@ -3,16 +3,16 @@ package com.github.bpazy.utils;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.List;
 
 /**
  * Created by Ziyuan.
  * 2016/12/5 13:44
  */
 public class QueueAndRedis {
-    private static final String REDIS_KEY = "movie";
+    private static final String REDIS_MOVIE_SET_KEY = "movieSet";
+    private static final String REDIS_MOVIE_LIST_KEY = "movieList";
     private static final String REDIS_PASSWORD = "1241";
-    private LinkedBlockingQueue<String> queue = new LinkedBlockingQueue<>();
     private JedisPool jedisPool = new JedisPool("192.168.154.128");
 
     /**
@@ -25,13 +25,18 @@ public class QueueAndRedis {
     public boolean queuePut(String tar) throws InterruptedException {
         boolean success = redisSetAdd(Helper.MD5(tar));
         if (success) {
-            queue.put(tar);
+            Jedis jedis = getJedis();
+            jedis.rpush(REDIS_MOVIE_LIST_KEY, tar);
+            jedis.close();
         }
         return success;
     }
 
     public String queueTake() throws InterruptedException {
-        return queue.take();
+        Jedis jedis = getJedis();
+        List<String> value = jedis.blpop(0, REDIS_MOVIE_LIST_KEY);
+        jedis.close();
+        return value.get(1);
     }
 
     /**
@@ -40,7 +45,7 @@ public class QueueAndRedis {
      */
     public boolean redisSetAdd(String tar) {
         Jedis jedis = getJedis();
-        Long book = jedis.sadd(REDIS_KEY, tar);
+        Long book = jedis.sadd(REDIS_MOVIE_SET_KEY, tar);
         jedis.close();
         return book == 1;
     }
@@ -53,7 +58,7 @@ public class QueueAndRedis {
 
     public boolean redisSetContains(String tar) {
         Jedis jedis = getJedis();
-        Boolean isExist = jedis.sismember(REDIS_KEY, tar);
+        Boolean isExist = jedis.sismember(REDIS_MOVIE_SET_KEY, tar);
         jedis.close();
         return isExist;
     }
