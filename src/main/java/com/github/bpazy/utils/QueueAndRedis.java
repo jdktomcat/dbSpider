@@ -10,13 +10,14 @@ import java.util.concurrent.LinkedBlockingQueue;
  * 2016/12/5 13:44
  */
 public class QueueAndRedis {
-    private static final String REDIS_KEY = "book";
+    private static final String REDIS_KEY = "movie";
     private static final String REDIS_PASSWORD = "1241";
     private LinkedBlockingQueue<String> queue = new LinkedBlockingQueue<>();
     private JedisPool jedisPool = new JedisPool("192.168.154.128");
 
     /**
      * 判断目标是否已经存在队列中，不存在则插入，存在则不插入。
+     *
      * @param tar 目标
      * @return 插入成功返回true
      * @throws InterruptedException 插入失败抛出

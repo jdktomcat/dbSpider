@@ -11,6 +11,7 @@ public class SqlFactory {
     private SqlFactory() {
 
     }
+
     public static SessionFactory getSessionFactory() {
         return Instance.factory;
     }

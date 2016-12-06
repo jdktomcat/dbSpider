@@ -4,7 +4,7 @@ package com.github.bpazy.model;
  * Created by Ziyuan.
  * 2016/12/5 16:43
  */
-public class Book {
+public class Movie {
     private int id;
     private String title;
     private String ratingNum;
@@ -24,8 +24,9 @@ public class Book {
 
     @Override
     public String toString() {
-        return "Book{" +
-                "title='" + title + '\'' +
+        return "Movie{" +
+                "id=" + id +
+                ", title='" + title + '\'' +
                 ", ratingNum='" + ratingNum + '\'' +
                 ", ratingPeople=" + ratingPeople +
                 '}';
