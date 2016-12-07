@@ -1,5 +1,6 @@
 package com.github.bpazy.core;
 
+import com.github.bpazy.utils.Application;
 import com.github.bpazy.utils.Helper;
 import com.github.bpazy.utils.QueueAndRedis;
 import com.github.bpazy.utils.SqlFactory;
@@ -10,12 +11,15 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+
 /**
  * Created by Ziyuan.
  * 2016/12/6 15:10
  */
 public abstract class SpiderCore<T> {
-    private static final int TIMEOUT = 1000 * 30;
+    private static final int TIMEOUT = 1000 * 5;
     private String target;
     private QueueAndRedis queueAndRedis;
     private SessionFactory factory = SqlFactory.getSessionFactory();
@@ -26,25 +30,39 @@ public abstract class SpiderCore<T> {
     }
 
     void run() {
-        String body = HttpRequest
-                .get(target)
-                .header("Cookie", "bid=" + Helper.getRandomString(11))
-                .readTimeout(TIMEOUT)
-                .connectTimeout(TIMEOUT)
-                .body();
+        String body;
+        try {
+            body = HttpRequest
+                    .get(target)
+                    .header("Cookie", "bid=" + Helper.getRandomString(11))
+                    .readTimeout(TIMEOUT)
+                    .connectTimeout(TIMEOUT)
+                    .body();
+        } catch (HttpRequest.HttpRequestException e) {
+            queueAndRedis.redisSetRemove(target);
+            queueAndRedis.queuePut(target);
+            System.err.println("Failed at: " + target);
+            signAllWatingThread();
+            return;
+        }
         Document doc = Jsoup.parse(body);
         save(doc);
         Elements hrefElements = doc.select(relatedUrlSelect());
         hrefElements.forEach(element -> {
-            try {
-                String href = element.attr("href");
-                if (!"".equals(href)) {
-                    queueAndRedis.queuePut(href);
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            String href = element.attr("href");
+            if (!"".equals(href)) {
+                queueAndRedis.queuePut(href);
             }
         });
+        signAllWatingThread();
+    }
+
+    private void signAllWatingThread() {
+        Lock lock = Application.getLock();
+        Condition condition = Application.getCondition();
+        lock.lock();
+        condition.signalAll();
+        lock.unlock();
     }
 
     private void save(Document doc) {

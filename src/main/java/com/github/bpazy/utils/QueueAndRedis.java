@@ -22,7 +22,7 @@ public class QueueAndRedis {
      * @return 插入成功返回true
      * @throws InterruptedException 插入失败抛出
      */
-    public boolean queuePut(String tar) throws InterruptedException {
+    public boolean queuePut(String tar) {
         boolean success = redisSetAdd(Helper.MD5(tar));
         if (success) {
             Jedis jedis = getJedis();
@@ -61,5 +61,11 @@ public class QueueAndRedis {
         Boolean isExist = jedis.sismember(REDIS_MOVIE_SET_KEY, tar);
         jedis.close();
         return isExist;
+    }
+
+    public long redisSetRemove(String tar) {
+        Jedis jedis = getJedis();
+        jedis.close();
+        return jedis.srem(REDIS_MOVIE_SET_KEY, tar);
     }
 }

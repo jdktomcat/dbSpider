@@ -18,6 +18,7 @@ public abstract class Spider<T> {
     private ExecutorService service = Executors.newFixedThreadPool(MAX_THREAD_NUM);
     private QueueAndRedis queueAndRedis = new QueueAndRedis();
     private String[] origin;
+    private boolean shouldQuit;
 
     protected Spider(String... origin) {
         this.origin = origin;
@@ -32,11 +33,16 @@ public abstract class Spider<T> {
                 queueAndRedis.queuePut(u);
             }
             while (true) {
+                if (shouldQuit) {
+                    break;
+                }
+                String url;
                 try {
-                    // TODO 优雅的退出
-                    String url = queueAndRedis.queueTake();
+                    url = queueAndRedis.queueTake();
+                    String finalUrl = url;
+                    checkShutdown(url);
                     service.execute(() -> {
-                        SpiderCore client = spiderCore(url, queueAndRedis);
+                        SpiderCore client = spiderCore(finalUrl, queueAndRedis);
                         client.run();
                     });
                 } catch (InterruptedException e) {
@@ -44,10 +50,33 @@ public abstract class Spider<T> {
                     break;
                 }
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         } finally {
+            waitingAllSubThreadEnding();
             SqlFactory.getSessionFactory().close();
+        }
+    }
+
+    private void waitingAllSubThreadEnding() {
+        Lock lock = Application.getLock();
+        Condition condition = Application.getCondition();
+        while (!service.isTerminated()) {
+            lock.lock();
+            try {
+                condition.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                lock.unlock();
+            }
+        }
+    }
+
+    private void checkShutdown(String url) {
+        if (service.isShutdown()) {
+            if (shouldQuit && url != null) {
+                queueAndRedis.redisSetRemove(url);
+                queueAndRedis.queuePut(url);
+            }
         }
     }
 
@@ -55,16 +84,9 @@ public abstract class Spider<T> {
         Runtime
                 .getRuntime()
                 .addShutdownHook(new Thread(() -> {
-                    Lock lock = Application.getLock();
-                    Condition condition = Application.getCondition();
-                    lock.lock();
-                    try {
-                        condition.await();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    } finally {
-                        lock.unlock();
-                    }
+                    shouldQuit = true;
+                    service.shutdownNow();
+                    waitingAllSubThreadEnding();
                 }));
     }
 }
