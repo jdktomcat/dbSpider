@@ -33,34 +33,36 @@ public abstract class Spider<T> {
                 queueAndRedis.queuePut(u);
             }
             while (true) {
+                if (shouldQuit) {
+                    break;
+                }
+                String url;
                 try {
-                    String url = null;
-                    while (url == null) {
-                        url = queueAndRedis.queueTake();
-                        if (shouldQuit) {
-                            break;
-                        }
-                    }
-                    if (shouldShutdown()) break;
+                    url = queueAndRedis.queueTake();
                     String finalUrl = url;
+                    checkShutdown(url);
                     service.execute(() -> {
                         SpiderCore client = spiderCore(finalUrl, queueAndRedis);
                         client.run();
                     });
                 } catch (InterruptedException e) {
                     e.printStackTrace();
+                    break;
                 }
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         } finally {
-            Lock lock = Application.getLock();
+            waitingAllSubThreadEnding();
+            SqlFactory.getSessionFactory().close();
+        }
+    }
+
+    private void waitingAllSubThreadEnding() {
+        Lock lock = Application.getLock();
+        Condition condition = Application.getCondition();
+        while (!service.isTerminated()) {
             lock.lock();
             try {
-                while (!service.isTerminated()) {
-                    Application.getCondition().await();
-                }
-                SqlFactory.getSessionFactory().close();
+                condition.await();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -69,33 +71,22 @@ public abstract class Spider<T> {
         }
     }
 
-    private boolean shouldShutdown() {
-        if (shouldQuit) {
-            if (!service.isShutdown()) {
-                service.shutdown();
+    private void checkShutdown(String url) {
+        if (service.isShutdown()) {
+            if (shouldQuit && url != null) {
+                queueAndRedis.redisSetRemove(url);
+                queueAndRedis.queuePut(url);
             }
-            return true;
         }
-        return false;
     }
 
     private void addShutdownHook() {
         Runtime
                 .getRuntime()
                 .addShutdownHook(new Thread(() -> {
-                    Lock lock = Application.getLock();
-                    Condition condition = Application.getCondition();
-                    lock.lock();
-                    try {
-                        shouldQuit = true;
-                        while (!service.isTerminated()) {
-                            condition.await();
-                        }
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    } finally {
-                        lock.unlock();
-                    }
+                    shouldQuit = true;
+                    service.shutdownNow();
+                    waitingAllSubThreadEnding();
                 }));
     }
 }
