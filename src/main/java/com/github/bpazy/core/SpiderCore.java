@@ -1,5 +1,6 @@
 package com.github.bpazy.core;
 
+import com.github.bpazy.utils.Application;
 import com.github.bpazy.utils.Helper;
 import com.github.bpazy.utils.QueueAndRedis;
 import com.github.bpazy.utils.SqlFactory;
@@ -10,12 +11,15 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
+import java.util.concurrent.locks.Lock;
+
 /**
  * Created by Ziyuan.
  * 2016/12/6 15:10
  */
 public abstract class SpiderCore<T> {
-    private static final int TIMEOUT = 1000 * 30;
+    private static final int TIMEOUT = 1000 * 30; // HTTP超时时间
+    private static final int REPEAT_TIMES = 3; // HTTP重试次数
     private String target;
     private QueueAndRedis queueAndRedis;
     private SessionFactory factory = SqlFactory.getSessionFactory();
@@ -26,12 +30,7 @@ public abstract class SpiderCore<T> {
     }
 
     void run() {
-        String body = HttpRequest
-                .get(target)
-                .header("Cookie", "bid=" + Helper.getRandomString(11))
-                .readTimeout(TIMEOUT)
-                .connectTimeout(TIMEOUT)
-                .body();
+        String body = downloadPage();
         Document doc = Jsoup.parse(body);
         save(doc);
         Elements hrefElements = doc.select(relatedUrlSelect());
@@ -45,6 +44,30 @@ public abstract class SpiderCore<T> {
                 e.printStackTrace();
             }
         });
+        signalShutdownHook();
+    }
+
+    private void signalShutdownHook() {
+        Lock lock = Application.getLock();
+        lock.lock();
+        Application.getCondition().signalAll();
+        lock.unlock();
+    }
+
+    private String downloadPage() {
+        for (int i = 0; i < REPEAT_TIMES; i++) {
+            try {
+                return HttpRequest
+                        .get(target)
+                        .header("Cookie", "bid=" + Helper.getRandomString(11))
+                        .readTimeout(TIMEOUT)
+                        .connectTimeout(TIMEOUT)
+                        .body();
+            } catch (HttpRequest.HttpRequestException e) {
+                e.printStackTrace();
+            }
+        }
+        return "";
     }
 
     private void save(Document doc) {

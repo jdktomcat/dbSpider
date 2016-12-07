@@ -34,8 +34,11 @@ public class QueueAndRedis {
 
     public String queueTake() throws InterruptedException {
         Jedis jedis = getJedis();
-        List<String> value = jedis.blpop(0, REDIS_MOVIE_LIST_KEY);
+        List<String> value = jedis.blpop(1, REDIS_MOVIE_LIST_KEY);
         jedis.close();
+        if (value.size() == 0) {
+            return null;
+        }
         return value.get(1);
     }
 

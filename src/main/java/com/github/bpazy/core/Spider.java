@@ -18,6 +18,7 @@ public abstract class Spider<T> {
     private ExecutorService service = Executors.newFixedThreadPool(MAX_THREAD_NUM);
     private QueueAndRedis queueAndRedis = new QueueAndRedis();
     private String[] origin;
+    private boolean shouldQuit;
 
     protected Spider(String... origin) {
         this.origin = origin;
@@ -33,22 +34,49 @@ public abstract class Spider<T> {
             }
             while (true) {
                 try {
-                    // TODO 优雅的退出
-                    String url = queueAndRedis.queueTake();
+                    String url = null;
+                    while (url == null) {
+                        url = queueAndRedis.queueTake();
+                        if (shouldQuit) {
+                            break;
+                        }
+                    }
+                    if (shouldShutdown()) break;
+                    String finalUrl = url;
                     service.execute(() -> {
-                        SpiderCore client = spiderCore(url, queueAndRedis);
+                        SpiderCore client = spiderCore(finalUrl, queueAndRedis);
                         client.run();
                     });
                 } catch (InterruptedException e) {
                     e.printStackTrace();
-                    break;
                 }
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
-            SqlFactory.getSessionFactory().close();
+            Lock lock = Application.getLock();
+            lock.lock();
+            try {
+                while (!service.isTerminated()) {
+                    Application.getCondition().await();
+                }
+                SqlFactory.getSessionFactory().close();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                lock.unlock();
+            }
         }
+    }
+
+    private boolean shouldShutdown() {
+        if (shouldQuit) {
+            if (!service.isShutdown()) {
+                service.shutdown();
+            }
+            return true;
+        }
+        return false;
     }
 
     private void addShutdownHook() {
@@ -59,7 +87,10 @@ public abstract class Spider<T> {
                     Condition condition = Application.getCondition();
                     lock.lock();
                     try {
-                        condition.await();
+                        shouldQuit = true;
+                        while (!service.isTerminated()) {
+                            condition.await();
+                        }
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     } finally {
