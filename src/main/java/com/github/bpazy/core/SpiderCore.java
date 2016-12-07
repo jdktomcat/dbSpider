@@ -1,6 +1,5 @@
 package com.github.bpazy.core;
 
-import com.github.bpazy.utils.Application;
 import com.github.bpazy.utils.Helper;
 import com.github.bpazy.utils.QueueAndRedis;
 import com.github.bpazy.utils.SqlFactory;
@@ -10,9 +9,6 @@ import org.hibernate.SessionFactory;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
-
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 
 /**
  * Created by Ziyuan.
@@ -42,7 +38,6 @@ public abstract class SpiderCore<T> {
             queueAndRedis.redisSetRemove(target);
             queueAndRedis.queuePut(target);
             System.err.println("Failed at: " + target);
-            signAllWatingThread();
             return;
         }
         Document doc = Jsoup.parse(body);
@@ -54,15 +49,6 @@ public abstract class SpiderCore<T> {
                 queueAndRedis.queuePut(href);
             }
         });
-        signAllWatingThread();
-    }
-
-    private void signAllWatingThread() {
-        Lock lock = Application.getLock();
-        Condition condition = Application.getCondition();
-        lock.lock();
-        condition.signalAll();
-        lock.unlock();
     }
 
     private void save(Document doc) {

@@ -1,13 +1,11 @@
 package com.github.bpazy.core;
 
-import com.github.bpazy.utils.Application;
 import com.github.bpazy.utils.QueueAndRedis;
 import com.github.bpazy.utils.SqlFactory;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Created by Ziyuan.
@@ -28,54 +26,31 @@ public abstract class Spider<T> {
 
     public void start() {
         addShutdownHook();
-        try {
-            for (String u : origin) {
-                queueAndRedis.queuePut(u);
+        for (String u : origin) {
+            queueAndRedis.queuePut(u);
+        }
+        while (true) {
+            if (shouldQuit) {
+                break;
             }
-            while (true) {
-                if (shouldQuit) {
-                    break;
-                }
-                String url;
-                try {
-                    url = queueAndRedis.queueTake();
-                    String finalUrl = url;
-                    checkShutdown(url);
+            String url;
+            try {
+                url = queueAndRedis.queueTake();
+                String finalUrl = url;
+                if (!service.isShutdown()) {
                     service.execute(() -> {
                         SpiderCore client = spiderCore(finalUrl, queueAndRedis);
                         client.run();
                     });
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    break;
+                } else {
+                    if (url != null) {
+                        queueAndRedis.redisSetRemove(url);
+                        queueAndRedis.queuePut(url);
+                    }
                 }
-            }
-        } finally {
-            waitingAllSubThreadEnding();
-            SqlFactory.getSessionFactory().close();
-        }
-    }
-
-    private void waitingAllSubThreadEnding() {
-        Lock lock = Application.getLock();
-        Condition condition = Application.getCondition();
-        while (!service.isTerminated()) {
-            lock.lock();
-            try {
-                condition.await();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException | RejectedExecutionException e) {
                 e.printStackTrace();
-            } finally {
-                lock.unlock();
-            }
-        }
-    }
-
-    private void checkShutdown(String url) {
-        if (service.isShutdown()) {
-            if (shouldQuit && url != null) {
-                queueAndRedis.redisSetRemove(url);
-                queueAndRedis.queuePut(url);
+                break;
             }
         }
     }
@@ -86,7 +61,14 @@ public abstract class Spider<T> {
                 .addShutdownHook(new Thread(() -> {
                     shouldQuit = true;
                     service.shutdownNow();
-                    waitingAllSubThreadEnding();
+                    while (!service.isTerminated()) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    SqlFactory.getSessionFactory().close();
                 }));
     }
 }
