@@ -13,12 +13,11 @@ import java.util.List;
 public class QueueAndRedis {
     private static final String REDIS_MOVIE_SET_KEY = "movieSet";
     private static final String REDIS_MOVIE_LIST_KEY = "movieList";
-    private static final String REDIS_PASSWORD = "1241";
     private JedisPool jedisPool;
 
     public QueueAndRedis() {
         JedisPoolConfig config = new JedisPoolConfig();
-        this.jedisPool = new JedisPool(config, "192.168.154.128");
+        this.jedisPool = new JedisPool(config, "10.101.25.169");
     }
 
     /**
@@ -57,7 +56,6 @@ public class QueueAndRedis {
 
     private Jedis getJedis() {
         Jedis jedis = jedisPool.getResource();
-        jedis.auth(REDIS_PASSWORD);
         return jedis;
     }
 
