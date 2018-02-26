@@ -4,9 +4,9 @@
         "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
 <hibernate-configuration>
     <session-factory>
-        <property name="connection.url">jdbc:mysql://192.168.154.128:3306/douban?useSSL=false&amp;useUnicode=true&amp;characterEncoding=UTF-8</property>
+        <property name="connection.url">jdbc:mysql://10.101.25.141:3306/douban?useSSL=false&amp;useUnicode=true&amp;characterEncoding=UTF-8</property>
         <property name="connection.username">root</property>
-        <property name="connection.password">1241</property>
+        <property name="connection.password">c1e2d1</property>
         <property name="connection.driver_class">com.mysql.cj.jdbc.Driver</property>
         <property name="connection.pool_size">100</property>
         <property name="dialect">org.hibernate.dialect.MySQL5Dialect</property>
